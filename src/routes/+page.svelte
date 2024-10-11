@@ -1,151 +1,191 @@
-	<script>
-		let vowelsCount = 1;
-		const vowelsCountOptions = [
-			{ value: 1, label: 'Бир муун' },
-			{ value: 2, label: 'Эки муун' },
-			{ value: 3, label: 'Үч муун' },
-		];
+<script>
+	let vowelsCount = 1;
+	const vowelsCountOptions = [
+		{ value: 1, label: 'Бир муун' },
+		{ value: 2, label: 'Эки муун' },
+		{ value: 3, label: 'Үч муун' },
+	];
 
-		let withHead = false;
-		let withTail = false;
-		let firstLetter = '';
-		let vowels = Array(3).fill(''); // Массив для гласных
-		let longVowelStates = Array(3).fill(false); // Состояние для долгих гласных (чекбоксы)
+	let withHead = false;
+	let withTail = false;
+	let firstLetter = '';
+	let vowels = Array(3).fill(''); // Массив для гласных
+	let longVowelStates = Array(3).fill(false); // Состояние для долгих гласных (чекбоксы)
+	let consonants = Array(2).fill(''); // Массив для согласных
+	let consonantStates = Array(2).fill(false); // Состояние чекбоксов для согласных
 
-		const allowedVowels = ['ө', 'ү', 'а', 'о', 'е', 'и', 'ы', 'э', 'у', 'я', 'ё', 'ю']; // Разрешённые гласные
-		const longVowelMapping = {
-			'у': 'уу',
-			'а': 'аа',
-			'э': 'ээ',
-			'ө': 'өө',
-			'ү': 'үү',
-			'о': 'оо'
+	const allowedVowels = ['ө', 'ү', 'а', 'о', 'е', 'и', 'ы', 'э', 'у', 'я', 'ё', 'ю'];
+	const longVowelMapping = {
+		'у': 'уу',
+		'а': 'аа',
+		'э': 'ээ',
+		'ө': 'өө',
+		'ү': 'үү',
+		'о': 'оо'
+	};
+
+	let wordsMap = { /*... ваш массив слов ...*/ };
+	let idioms = []
+
+	function insertVowel(index, vowel) {
+		vowels[index] = vowel;
+		if (longVowelMapping[vowel]) {
+			longVowelStates[index] = true;
+		} else {
+			longVowelStates[index] = false;
+		}
+	}
+
+	function insertConsonant(index, consonant) {
+		if (consonantStates[index]) {
+			consonants[index] = consonant;
+		}
+	}
+
+	function handleVowelInput(event, index) {
+		const value = event.target.value.toLowerCase();
+		if (allowedVowels.includes(value)) {
+			vowels[index] = value;
+			longVowelStates[index] = !!longVowelMapping[value];
+		} else {
+			event.target.value = '';
+		}
+	}
+
+	function toggleLongVowel(event, index) {
+		const isChecked = event.target.checked;
+		const currentVowel = vowels[index];
+		if (isChecked && longVowelMapping[currentVowel]) {
+			vowels[index] = longVowelMapping[currentVowel];
+		} else if (!isChecked && Object.values(longVowelMapping).includes(currentVowel)) {
+			vowels[index] = Object.keys(longVowelMapping).find(key => longVowelMapping[key] === currentVowel);
+		}
+	}
+
+	function handleConsonantInput(event, index) {
+		consonants[index] = event.target.value;
+	}
+
+	function toggleConsonantState(event, index) {
+		consonantStates[index] = event.target.checked;
+		if (!consonantStates[index]) {
+			consonants[index] = ''; // Если отключено, очищаем значение
+		}
+	}
+
+	async function createObject() {
+		const headless = !withHead;
+		const tailless = !withTail;
+
+		// Регулируем массив согласных в зависимости от активных слогов
+		const filteredConsonants = consonants
+			.map((consonant, index) => consonantStates[index] ? consonant : '') // Очищаем отключенные согласные
+			.filter((_, i) => i < vowelsCount - 1); // Оставляем только нужное количество согласных
+
+		const result = {
+			'vowels': vowels.slice(0, vowelsCount),
+			'consonants': filteredConsonants,
+			headless,
+			tailless,
+			'first-letter': firstLetter
 		};
 
-		let wordsMap = {
-			'зат': [
-				['адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'адам', 'абад'],
-				['кадам', 'кабат']
-			],
-			'сын': [
-				['жаман']
-			]
-		};
-
-		// Функция для вставки буквы в соответствующее поле и проверки состояния чекбокса
-		function insertVowel(index, vowel) {
-			vowels[index] = vowel;
-
-			// Проверка возможности удлинения вставленной буквы
-			if (longVowelMapping[vowel]) {
-				longVowelStates[index] = true;
-			} else {
-				longVowelStates[index] = false;
+		try {
+			const response = await fetch('http://localhost:5000/matching-words', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(result)
+			});
+			if (response.ok) {
+				let responseJson = await response.json();
+				wordsMap = responseJson['words']
+				idioms = responseJson['idioms']
+				console.log(responseJson);
 			}
+		} catch (err) {
+			console.error(err);
 		}
+	}
+</script>
 
-		// Ограничение ввода только гласными буквами
-		function handleVowelInput(event, index) {
-			const value = event.target.value.toLowerCase();
-			if (allowedVowels.includes(value)) {
-				vowels[index] = value; // Если это гласная буква, сохранить её
+<main>
+	<section class="request">
+		<div class="header">
+			<input type="checkbox" bind:checked={withHead} />
+			<select bind:value={vowelsCount}>
+				{#each vowelsCountOptions as option}
+					<option value={option.value}>{option.label}</option>
+				{/each}
+			</select>
+			<input type="checkbox" bind:checked={withTail} />
+		</div>
 
-				// Активировать чекбокс, если введена гласная, которую можно удлинить
-				longVowelStates[index] = !!longVowelMapping[value];
-			} else {
-				event.target.value = ''; // Удалить все другие символы
-			}
-		}
+		<div class="letter">
+			<span>Башы</span>
+			<input type="text" maxlength="1" bind:value={firstLetter} />
+			<button tabindex="-1" on:click={() => firstLetter='ө'}>ө</button>
+			<button tabindex="-1" on:click={() => firstLetter='ү'}>ү</button>
+			<button tabindex="-1" on:click={() => firstLetter='ң'}>ң</button>
+		</div>
 
-		// Функция для замены гласной на долгую
-		function toggleLongVowel(event, index) {
-			const isChecked = event.target.checked;
-			const currentVowel = vowels[index];
-
-			// Если чекбокс активен и текущая гласная допустима для долготы
-			if (isChecked && longVowelMapping[currentVowel]) {
-				vowels[index] = longVowelMapping[currentVowel];
-			} else if (!isChecked && Object.values(longVowelMapping).includes(currentVowel)) {
-				// Если чекбокс выключен, возвращаем краткую версию гласной
-				vowels[index] = Object.keys(longVowelMapping).find(key => longVowelMapping[key] === currentVowel);
-			}
-		}
-
-		// Функция для создания объекта
-		async function createObject() {
-			const headless = !withHead;
-			const tailless = !withTail;
-			const result = {
-				'vowels': vowels.slice(0, vowelsCount), 'consonants': [], headless, tailless, 'first-letter': firstLetter
-			};
-			try {
-				const response = await fetch('http://localhost:5000/matching-words', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify(result)
-				});
-				if (response.ok) {
-					wordsMap = await response.json();
-					console.log(wordsMap);
-				}
-			} catch (err) {
-				console.error(err);
-			}
-		}
-	</script>
-
-	<main>
-		<section class="request">
-			<div class="header">
-				<input type="checkbox" bind:checked={withHead} />
-				<select bind:value={vowelsCount}>
-					{#each vowelsCountOptions as option}
-						<option value={option.value}>{option.label}</option>
-					{/each}
-				</select>
-				<input type="checkbox" bind:checked={withTail} />
-			</div>
-
+		{#each Array(vowelsCount) as _, index}
 			<div class="letter">
-				<span>Башы</span>
-				<input type="text" maxlength="1" bind:value={firstLetter} />
-				<button on:click={() => firstLetter='ө'}>ө</button>
-				<button on:click={() => firstLetter='ү'}>ү</button>
-				<button on:click={() => firstLetter='ң'}>ң</button>
+				<input type="text" maxlength="1" bind:value={vowels[index]} on:input={(e) => handleVowelInput(e, index)} />
+				<input type="checkbox" on:change={(e) => toggleLongVowel(e, index)} disabled={!longVowelStates[index]} />
+				<button tabindex="-1" on:click={() => insertVowel(index, 'ө')}>ө</button>
+				<button tabindex="-1" on:click={() => insertVowel(index, 'ү')}>ү</button>
 			</div>
 
-			{#each Array(vowelsCount) as _, index}
+			{#if index < vowelsCount - 1}
 				<div class="letter">
-					<input type="text" maxlength="1" bind:value={vowels[index]} on:input={(e) => handleVowelInput(e, index)} />
-					<input type="checkbox" on:change={(e) => toggleLongVowel(e, index)} disabled={!longVowelStates[index]} />
-					<button on:click={() => insertVowel(index, 'ө')}>ө</button>
-					<button on:click={() => insertVowel(index, 'ү')}>ү</button>
+					<input type="text" bind:value={consonants[index]} on:input={(e) => handleConsonantInput(e, index)} disabled={!consonantStates[index]} />
+					<input tabindex="-1" type="checkbox" on:change={(e) => toggleConsonantState(e, index)} />
+					<button tabindex="-1" on:click={() => insertConsonant(index, 'ң')}>ң</button>
 				</div>
-			{/each}
+			{/if}
+		{/each}
 
-			<button on:click={createObject}>Кана?</button>
-		</section>
-		<section class="response">
-			{#each Object.entries(wordsMap) as [type, wordsLists]}
-				<div class="words-types">
-					<input type="checkbox" id={type} class="toggle" />
-					<label for={type} class="type">
-						{type}
-					</label>
+		<button on:click={createObject}>Кана?</button>
+	</section>
 
-					<div class="words-container">
-						{#each wordsLists as wordsList}
-							<div class="words">
-								{wordsList}
-							</div>
-						{/each}
+	<section class="response">
+		<div>
+			<input type="checkbox" id="words-toggle" class="words-toggle">
+			<lable for="words-toggle" class="result-type">Сөздөр</lable>
+			<div class="words-outer-container">
+				{#each Object.entries(wordsMap) as [type, wordsLists]}
+					<div class="words-types">
+						<input type="checkbox" id={type} class="toggle" />
+						<label for={type} class="type">
+							{type}
+						</label>
+
+						<div class="words-container">
+							{#each wordsLists as wordsList}
+								<div class="words">
+									{wordsList}
+								</div>
+							{/each}
+						</div>
 					</div>
-				</div>
-			{/each}
-		</section>
-	</main>
+				{/each}
+			</div>
+		</div>
+		<div>
+			<input type="checkbox" id="idioms-toggle" class="idioms-toggle">
+			<lable for="idioms-toggle" class="result-type">Фразеологизмдер</lable>
+			<div class="idioms-outer-container result-type">
+				{#each idioms as idiom}
+					<div>
+						{idiom}
+					</div>
+				{/each}
+			</div>
+		</div>
+	</section>
+</main>
 
 
 
@@ -241,5 +281,21 @@
 
       .words {
           padding: 5px 10px; /* Отступы для слов */
+      }
+
+			.words-outer-container {
+					display: none;
+			}
+
+			.words-toggle:checked +.result-type + .words-outer-container {
+					display: block;
+			}
+
+      .idioms-outer-container {
+          display: none;
+      }
+
+      .idioms-toggle:checked +.result-type + .idioms-outer-container {
+          display: block;
       }
 	</style>
